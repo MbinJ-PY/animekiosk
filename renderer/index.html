@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnimeKiosk</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      height: 48px;
+      background: #18181b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-app-region: drag; /* allow dragging the toolbar */
+      user-select: none;
+    }
+
+    button {
+      -webkit-app-region: no-drag;
+      background: transparent;
+      border: none;
+      color: #a1a1aa;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 5px 7px;
+      font-size: 16px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    button:hover:not(:disabled) { background: #27272a; color: #fff; }
+    button:disabled { opacity: 0.3; cursor: default; }
+
+    #url-bar {
+      -webkit-app-region: no-drag;
+      flex: 1;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      color: #e4e4e7;
+      font-size: 13px;
+      padding: 5px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #url-bar:focus { border-color: #6366f1; }
+    #bar {
+      -webkit-app-region: no-drag;
+      flex: 1;
+      background: #5151aa;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      color: #e4e4e7;
+      font-size: 13px;
+      padding: 5px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      text-align: center;
+    }
+    #bar:focus { border-color: #6366f1; }
+
+    #blocked-banner {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #7f1d1d;
+      color: #fca5a5;
+      font-size: 12px;
+      padding: 4px 14px;
+      animation: fadeOut 3s forwards;
+    }
+    @keyframes fadeOut {
+      0%   { opacity: 1; }
+      70%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    #error-screen {
+      display: none;
+      position: fixed;
+      top: 48px; left: 0; right: 0; bottom: 0;
+      background: #121214;
+      z-index: 1000;
+      font-family: system-ui, sans-serif;
+      color: #f4f4f5;
+    }
+    .error-container {
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      margin: 15vh auto 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .error-icon-wrapper {
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #error-details {
+      font-family: monospace;
+      font-size: 11px;
+      color: #71717a;
+      background: #1c1c1f;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 28px;
+      word-break: break-all;
+      border: 1px solid #27272a;
+      width: 100%;
+    }
+    #btn-retry {
+      background: #6366f1;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
+    }
+    #btn-retry:hover {
+      background: #4f46e5;
+    }
+    #btn-retry:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body>
+  <button id="btn-back"    title="Back (Alt+Left)"  disabled>&#8592;</button>
+  <button id="btn-forward" title="Forward (Alt+Right)" disabled>&#8594;</button>
+  <button id="btn-reload"  title="Reload (Ctrl+R)">&#8635;</button>
+  <button id="btn-home"    title="Home (Ctrl+H)">⌂</button>
+
+  <input id="url-bar" type="text" placeholder="https://animepahe.pw" spellcheck="false" hidden/>
+  <div id="bar"><p style="font-size: large; text-shadow: #18181b; text-decoration: double;"><b>AnimeKiosk</b></p></div>
+
+  <button id="btn-downloads" title="Downloads (Ctrl+Shift+D)">📥</button>
+  <!-- <button id="btn-settings" title="Settings (Ctrl+,)">⚙</button> -->
+
+  <div id="blocked-banner"></div>
+
+  <div id="error-screen">
+    <div class="error-container">
+      <div class="error-icon-wrapper">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+          <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
+          <path d="M7.34 6.4a15 15 0 0 1 14.66 1.6"></path>
+          <path d="M1.72 6.4a15 15 0 0 1 2.28-1.5"></path>
+          <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"></path>
+        </svg>
+      </div>
+      <h2 style="font-weight: 700; margin-bottom: 12px; letter-spacing: -0.025em; color: #ffffff;">Connection Failed</h2>
+      <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5; margin-bottom: 24px;">
+        AnimeKiosk couldn't load this page. Please check your internet connection and try again.
+      </p>
+      <div id="error-details"></div>
+      <button id="btn-retry">Retry Connection</button>
+    </div>
+  </div>
+
+  <script>
+    const back     = document.getElementById('btn-back');
+    const forward  = document.getElementById('btn-forward');
+    const reload   = document.getElementById('btn-reload');
+    const home     = document.getElementById('btn-home');
+    const urlBar   = document.getElementById('url-bar');
+    const downloads = document.getElementById('btn-downloads');
+    const settings = document.getElementById('btn-settings');
+    const banner   = document.getElementById('blocked-banner');
+
+    back.addEventListener('click',     () => window.kiosk.goBack());
+    forward.addEventListener('click',  () => window.kiosk.goForward());
+    reload.addEventListener('click',   () => window.kiosk.reload());
+    home.addEventListener('click',     () => window.kiosk.goHome());
+    downloads.addEventListener('click', () => window.kiosk.openDownloads());
+    if (settings) {
+      settings.addEventListener('click', () => window.kiosk.openSettings());
+    }
+
+    urlBar.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        let url = urlBar.value.trim();
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        window.kiosk.navigate(url);
+      }
+    });
+
+    window.kiosk.onUrlChanged(url => { urlBar.value = url; });
+    window.kiosk.onCanGoBack(v => { back.disabled = !v; });
+    window.kiosk.onCanGoForward(v => { forward.disabled = !v; });
+
+    window.kiosk.onBlocked(url => {
+      banner.textContent = '🚫 Blocked: ' + url;
+      banner.style.display = 'block';
+      banner.style.animation = 'none';
+      void banner.offsetWidth; // reflow
+      banner.style.animation = 'fadeOut 3s forwards';
+      setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    });
+
+    // Network Error UI logic
+    const errorScreen = document.getElementById('error-screen');
+    const errorDetails = document.getElementById('error-details');
+    const retryBtn = document.getElementById('btn-retry');
+
+    retryBtn.addEventListener('click', () => {
+      retryBtn.textContent = 'Retrying...';
+      retryBtn.disabled = true;
+      window.kiosk.retryLoad();
+    });
+
+    window.kiosk.onLoadError(data => {
+      console.log('[Renderer] Received load-error:', data);
+      errorDetails.textContent = `${data.errorDescription} (${data.url})`;
+      errorScreen.style.display = 'block';
+      retryBtn.textContent = 'Retry Connection';
+      retryBtn.disabled = false;
+    });
+
+    window.kiosk.onLoadSuccess(() => {
+      console.log('[Renderer] Received load-success');
+      errorScreen.style.display = 'none';
+    });
+  </script>
+</body>
+</html>

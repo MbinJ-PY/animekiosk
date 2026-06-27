@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Downloads</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #18181b;
+      color: #e4e4e7;
+      padding: 16px;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    #downloads-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .download-item {
+      background: #27272a;
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #3f3f46;
+      transition: border-color 0.15s;
+    }
+
+    .download-item:hover {
+      border-color: #52525b;
+    }
+
+    .filename {
+      font-weight: 600;
+      margin-bottom: 8px;
+      word-break: break-all;
+      font-size: 13px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #3f3f46;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #6366f1;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .info {
+      font-size: 11px;
+      color: #a1a1aa;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .info span {
+      flex-shrink: 0;
+    }
+
+    .controls {
+      display: flex;
+      gap: 6px;
+    }
+
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #3f3f46;
+      color: #e4e4e7;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    button:hover {
+      background: #52525b;
+    }
+
+    button:active {
+      background: #3f3f46;
+    }
+
+    .completed {
+      color: #4ade80;
+    }
+
+    .error {
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+  <h2>📥 Downloads</h2>
+  <div id="downloads-list"></div>
+
+  <script>
+    const list = document.getElementById('downloads-list');
+    const items = {};
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function formatSpeed(bytesPerSec) {
+      return formatBytes(bytesPerSec) + '/s';
+    }
+
+    function formatETA(secondsRemaining) {
+      if (secondsRemaining <= 0 || !isFinite(secondsRemaining)) return '--:--';
+      const hours = Math.floor(secondsRemaining / 3600);
+      const minutes = Math.floor((secondsRemaining % 3600) / 60);
+      const seconds = Math.floor(secondsRemaining % 60);
+      if (hours > 0) return hours + 'h ' + minutes + 'm';
+      return minutes + ':' + String(seconds).padStart(2, '0');
+    }
+
+    window.kiosk?.onDownloadProgress?.((data) => {
+      if (!items[data.itemId]) {
+        const div = document.createElement('div');
+        div.className = 'download-item';
+        div.id = 'dl-' + data.itemId;
+        div.innerHTML = `
+          <div class="filename">⬇️ ${data.filename}</div>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <div class="info">
+            <span><span class="percent">0</span>%</span>
+            <span><span class="size">0 B / 0 B</span></span>
+            <span><span class="speed">0 B/s</span></span>
+            <span><span class="eta">--:--</span></span>
+          </div>
+          <div class="controls">
+            <button class="pause">Pause</button>
+            <button class="cancel">Cancel</button>
+          </div>
+        `;
+        list.appendChild(div);
+        items[data.itemId] = {
+          element: div,
+          startTime: Date.now(),
+          lastTime: Date.now(),
+          lastBytes: 0,
+          isPaused: false
+        };
+
+        const pauseBtn = div.querySelector('.pause');
+        pauseBtn.onclick = () => {
+          if (items[data.itemId].isPaused) {
+            window.kiosk?.downloadResume?.(data.itemId);
+            items[data.itemId].isPaused = false;
+            pauseBtn.textContent = 'Pause';
+          } else {
+            window.kiosk?.downloadPause?.(data.itemId);
+            items[data.itemId].isPaused = true;
+            pauseBtn.textContent = 'Resume';
+          }
+        };
+        div.querySelector('.cancel').onclick = () =>
+          window.kiosk?.downloadCancel?.(data.itemId);
+      }
+
+      const item = items[data.itemId];
+      const percent = Math.round(data.progress);
+      const elapsedSeconds = (Date.now() - item.startTime) / 1000;
+      const currentSpeed = (data.receivedBytes - item.lastBytes) / ((Date.now() - item.lastTime) / 1000 || 1);
+      const avgSpeed = data.receivedBytes / (elapsedSeconds || 1);
+      const secondsRemaining = (data.totalBytes - data.receivedBytes) / (currentSpeed || 1);
+
+      item.lastBytes = data.receivedBytes;
+      item.lastTime = Date.now();
+
+      const elem = item.element;
+      elem.querySelector('.progress-fill').style.width = percent + '%';
+      elem.querySelector('.percent').textContent = percent;
+      elem.querySelector('.size').textContent = formatBytes(data.receivedBytes) + ' / ' + formatBytes(data.totalBytes);
+      elem.querySelector('.speed').textContent = formatSpeed(currentSpeed);
+      elem.querySelector('.eta').textContent = formatETA(secondsRemaining);
+    });
+
+    window.kiosk?.onDownloadDone?.((data) => {
+      if (items[data.itemId]) {
+        const item = items[data.itemId];
+        const controls = item.element.querySelector('.controls');
+        
+        if (data.state === 'completed') {
+          item.element.querySelector('.filename').classList.add('completed');
+          controls.innerHTML = '<span style="color: #4ade80; font-size: 12px;">✓ Complete</span>';
+        } else if (data.state === 'cancelled') {
+          item.element.querySelector('.filename').classList.add('error');
+          controls.innerHTML = '<span style="color: #f87171; font-size: 12px;">✗ Cancelled</span>';
+        } else {
+          item.element.querySelector('.filename').classList.add('error');
+          controls.innerHTML = '<span style="color: #f87171; font-size: 12px;">✗ Failed</span>';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
