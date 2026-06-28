@@ -1,6 +1,6 @@
 {
   "name": "anime-kiosk-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Focused, ad-free kiosk browser for anime streaming sites",
   "main": "main.js",
   "scripts": {
